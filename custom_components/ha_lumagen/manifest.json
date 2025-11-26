@@ -1,0 +1,11 @@
+{
+  "domain": "ha_lumagen",
+  "name": "Lumagen",
+  "codeowners": ["@vishy"],
+  "config_flow": true,
+  "documentation": "https://github.com/vishketan-ha/ha-lumagen",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "requirements": ["pylumagen>=2.0.9"],
+  "version": "0.1.0"
+}
