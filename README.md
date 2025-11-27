@@ -42,6 +42,8 @@ Home Assistant integration for Lumagen Radiance Pro video processors. Control an
 
 ### Setup
 
+**Important:** Ensure your Lumagen device is powered on (not in standby mode) before adding the integration for the first time. This allows the integration to properly fetch device information during initial setup.
+
 1. Go to **Settings** → **Devices & Services**
 2. Click **+ Add Integration**
 3. Search for "Lumagen"
@@ -50,7 +52,7 @@ Home Assistant integration for Lumagen Radiance Pro video processors. Control an
    - **Serial Connection**: Enter serial port path and baud rate (default: 9600)
 5. Click **Submit**
 
-The integration will automatically discover and create all entities for your device.
+The integration will automatically discover and create all entities for your device. Once configured, the device can be put in standby mode and the integration will continue to work (with appropriate entity availability based on device state).
 
 ## Entities
 
