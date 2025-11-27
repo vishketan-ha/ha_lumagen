@@ -31,9 +31,11 @@ class LumagenSensorEntityDescription(SensorEntityDescription):
     value_fn: Callable[[LumagenData], Any]
 
 
-def _format_output_resolution(data: LumagenData) -> str:
+def _format_output_resolution(data: LumagenData) -> str | None:
     """Format output resolution as a string."""
     device_info = data.device_info
+    if device_info is None:
+        return None
     return (
         f"{device_info.output_horizontal_resolution}x"
         f"{device_info.output_vertical_resolution}@"
@@ -47,13 +49,13 @@ STATUS_SENSORS: tuple[LumagenSensorEntityDescription, ...] = (
         key="logical_input",
         name="Logical Input",
         icon="mdi:video-input-hdmi",
-        value_fn=lambda data: data.device_info.logical_input,
+        value_fn=lambda data: data.device_info.logical_input if data.device_info else None,
     ),
     LumagenSensorEntityDescription(
         key="physical_input",
         name="Physical Input",
         icon="mdi:video-input-component",
-        value_fn=lambda data: data.device_info.physical_input,
+        value_fn=lambda data: data.device_info.physical_input if data.device_info else None,
     ),
     LumagenSensorEntityDescription(
         key="output_resolution",
@@ -65,31 +67,31 @@ STATUS_SENSORS: tuple[LumagenSensorEntityDescription, ...] = (
         key="source_aspect_ratio",
         name="Source Aspect Ratio",
         icon="mdi:aspect-ratio",
-        value_fn=lambda data: data.device_info.current_source_content_aspect,
+        value_fn=lambda data: data.device_info.current_source_content_aspect if data.device_info else None,
     ),
     LumagenSensorEntityDescription(
         key="source_dynamic_range",
         name="Source Dynamic Range",
         icon="mdi:brightness-7",
-        value_fn=lambda data: data.device_info.source_dynamic_range,
+        value_fn=lambda data: data.device_info.source_dynamic_range if data.device_info else None,
     ),
     LumagenSensorEntityDescription(
         key="input_configuration",
         name="Input Configuration",
         icon="mdi:cog",
-        value_fn=lambda data: data.device_info.active_input_config_number,
+        value_fn=lambda data: data.device_info.active_input_config_number if data.device_info else None,
     ),
     LumagenSensorEntityDescription(
         key="output_cms",
         name="Output CMS",
         icon="mdi:palette",
-        value_fn=lambda data: data.device_info.active_output_cms,
+        value_fn=lambda data: data.device_info.active_output_cms if data.device_info else None,
     ),
     LumagenSensorEntityDescription(
         key="output_style",
         name="Output Style",
         icon="mdi:image-filter-hdr",
-        value_fn=lambda data: data.device_info.active_output_style,
+        value_fn=lambda data: data.device_info.active_output_style if data.device_info else None,
     ),
 )
 
@@ -99,25 +101,25 @@ DIAGNOSTIC_SENSORS: tuple[LumagenSensorEntityDescription, ...] = (
         key="model_name",
         name="Model Name",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: data.device_info.model_name,
+        value_fn=lambda data: data.device_info.model_name if data.device_info else None,
     ),
     LumagenSensorEntityDescription(
         key="software_revision",
         name="Software Revision",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: data.device_info.software_revision,
+        value_fn=lambda data: data.device_info.software_revision if data.device_info else None,
     ),
     LumagenSensorEntityDescription(
         key="model_number",
         name="Model Number",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: data.device_info.model_number,
+        value_fn=lambda data: data.device_info.model_number if data.device_info else None,
     ),
     LumagenSensorEntityDescription(
         key="serial_number",
         name="Serial Number",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: data.device_info.serial_number,
+        value_fn=lambda data: data.device_info.serial_number if data.device_info else None,
     ),
 )
 
