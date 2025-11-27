@@ -82,11 +82,11 @@ class LumagenRemoteEntity(CoordinatorEntity[LumagenCoordinator], RemoteEntity):
         device_info = self.coordinator.data.device_info
         return {
             "identifiers": {(DOMAIN, self.coordinator.entry.entry_id)},
-            "name": f"Lumagen {device_info.model_name}",
+            "name": f"Lumagen {device_info.model_name if device_info else 'RadiancePro'}",
             "manufacturer": "Lumagen",
-            "model": device_info.model_name,
-            "sw_version": device_info.software_revision,
-            "serial_number": device_info.serial_number,
+            "model": device_info.model_name if device_info else "RadiancePro",
+            "sw_version": device_info.software_revision if device_info else None,
+            "serial_number": device_info.serial_number if device_info else None,
         }
 
     @property
