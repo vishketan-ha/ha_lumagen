@@ -6,7 +6,10 @@ DOMAIN = "ha_lumagen"
 # Connection defaults
 DEFAULT_PORT = 4999
 DEFAULT_BAUDRATE = 9600
-DEFAULT_SCAN_INTERVAL = 30
+
+# Pure event-driven architecture - no polling
+# All updates come from pylumagen dispatcher events
+# No DEFAULT_SCAN_INTERVAL needed
 
 # Connection types
 CONF_CONNECTION_TYPE = "connection_type"

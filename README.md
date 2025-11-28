@@ -6,6 +6,8 @@ Home Assistant integration for Lumagen Radiance Pro video processors. Control an
 
 ## Features
 
+- **Real-Time Updates** - Pure event-driven architecture with instant state updates (<1 second)
+- **Zero Polling Overhead** - No unnecessary network traffic or CPU usage
 - **Power Control** - Turn your Lumagen on/off or put it in standby mode
 - **Input Selection** - Switch between configured input sources
 - **Aspect Ratio Control** - Change source aspect ratio settings
@@ -42,8 +44,6 @@ Home Assistant integration for Lumagen Radiance Pro video processors. Control an
 
 ### Setup
 
-**Important:** Ensure your Lumagen device is powered on (not in standby mode) before adding the integration for the first time. This allows the integration to properly fetch device information during initial setup.
-
 1. Go to **Settings** → **Devices & Services**
 2. Click **+ Add Integration**
 3. Search for "Lumagen"
@@ -52,7 +52,7 @@ Home Assistant integration for Lumagen Radiance Pro video processors. Control an
    - **Serial Connection**: Enter serial port path and baud rate (default: 9600)
 5. Click **Submit**
 
-The integration will automatically discover and create all entities for your device. Once configured, the device can be put in standby mode and the integration will continue to work (with appropriate entity availability based on device state).
+The integration will automatically discover and create all entities for your device. The device can be in standby mode during setup - device information is retrieved regardless of power state.
 
 ## Entities
 
@@ -138,8 +138,8 @@ data:
 
 Available commands:
 - **Navigation**: `up`, `down`, `left`, `right`
-- **Menu Control**: `menu`, `enter`, `exit`, `back`, `home`, `ok`
-- **Utility**: `info`, `alt`, `clear`
+- **Menu Control**: `menu`, `ok`, `exit`, `enter`, `back`, `home`
+- **Utility**: `help`, `prev`, `alt`, `clear`, `info`
 - **Number Pad**: `0`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`
 
 ### Automations
@@ -172,29 +172,46 @@ automation:
 
 ### Entity Availability
 
-- Status sensors are only available when the device is active (not in standby)
+- All entities retain their cached values when the device is in standby or disconnected
+- Entities remain available showing last known state
+- Real-time updates resume immediately when device becomes active
 - Diagnostic sensors remain available even in standby mode
-- Power switch is always available when connected
-- Remote commands are blocked when the device is in standby
 
 ### Input Source Dropdown Empty
 
 If the input source dropdown is empty:
-1. Ensure the device is powered on and active
-2. Wait for the device to fully initialize (may take 30-60 seconds)
-3. Reload the integration
-4. Check that input sources are configured on the device
+1. Check that input sources are configured on the device with custom labels
+2. Verify the device is connected (check connection status in logs)
+3. Input labels are fetched automatically 1 second after connection is established
+4. If labels are updated on the device, the integration will receive an `input_labels` event and update automatically
 
-### UI Lag When Switching Power
-
-The device takes approximately 15 seconds to change power states. The integration uses optimistic state updates to provide immediate UI feedback while the device transitions.
 
 ## Development
 
-This integration is built using:
-- [pylumagen](https://github.com/johncarey70/pylumagen) - Python library for Lumagen control
-- Home Assistant's DataUpdateCoordinator for efficient polling
-- Proper entity availability handling for standby mode
+### Built With
+
+- **[pylumagen](https://github.com/johncarey70/pylumagen)** - Python library providing device communication and control
+- **[Kiro](https://kiro.ai)** - AI-powered development assistant used to build this integration
+
+### Architecture
+
+This integration implements a **pure event-driven architecture** for real-time responsiveness:
+
+**Event-Driven Updates:**
+- Subscribes to pylumagen dispatcher events for all device state changes
+- Updates appear in Home Assistant UI within 1 second of device changes
+- Zero polling overhead (`update_interval=None`)
+- Minimal resource usage - only processes actual state changes
+
+**Key Features:**
+- Automatic reconnection handling via pylumagen
+- Entities retain cached values when device is in standby or disconnected
+- Input labels fetched once on connection, then updated via events
+- Proper device info handling even in standby mode
+
+**Design Inspiration:**
+- Event-driven approach inspired by the [Unfolded Circle Lumagen Integration](https://github.com/johncarey70/uc-integration-lumagen)
+- Follows Home Assistant best practices for custom integrations
 
 ## Support
 
@@ -206,8 +223,9 @@ For issues, feature requests, or questions:
 
 - Integration developed for Home Assistant
 - Uses the [pylumagen](https://github.com/johncarey70/pylumagen) library
+- Event-driven architecture inspired by the [Unfolded Circle Lumagen Integration](https://github.com/johncarey70/uc-integration-lumagen)
 - Lumagen Radiance Pro is a product of Lumagen, Inc.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
