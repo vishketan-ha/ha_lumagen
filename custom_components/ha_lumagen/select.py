@@ -32,15 +32,16 @@ class LumagenSelectEntityDescription(SelectEntityDescription):
 
 # Aspect ratio mapping to pylumagen methods
 ASPECT_RATIO_MAP = {
-    "4:3": "aspect_4_3",
-    "16:9": "aspect_16_9",
-    "1.85": "aspect_1_85",
-    "1.90": "aspect_1_90",
-    "2.00": "aspect_2_00",
-    "2.20": "aspect_2_20",
-    "2.35": "aspect_2_35",
-    "2.40": "aspect_2_40",
-    "Letterbox": "aspect_letterbox",
+    "4:3": "source_aspect_4x3",
+    "16:9": "source_aspect_16x9",
+    "1.85": "source_aspect_1_85",
+    "1.90": "source_aspect_1_90",
+    "2.00": "source_aspect_2_00",
+    "2.20": "source_aspect_2_20",
+    "2.35": "source_aspect_2_35",
+    "2.40": "source_aspect_2_40",
+    "Letterbox": "source_aspect_lbox",
+    "NLS": "nls",
 }
 
 
@@ -51,14 +52,15 @@ async def _select_input_source(coordinator: LumagenCoordinator, option: str) -> 
     
     # Find the input number (index) that matches the label
     try:
-        input_number = source_list.index(option)
-        _LOGGER.debug("Selecting input %d (%s)", input_number, option)
+        # source_list is 0-indexed, but Lumagen expects 1-indexed inputs
+        input_index = source_list.index(option) + 1
+        _LOGGER.debug("Selecting input %d (%s)", input_index, option)
     except ValueError:
         _LOGGER.error("Could not find input number for label: %s", option)
         return
     
     # Send input selection command
-    await coordinator.device_manager.executor.input_select(input_number)
+    await coordinator.device_manager.executor.input(input_index)
 
 
 async def _select_aspect_ratio(coordinator: LumagenCoordinator, option: str) -> None:
@@ -69,17 +71,28 @@ async def _select_aspect_ratio(coordinator: LumagenCoordinator, option: str) -> 
         return
     
     _LOGGER.debug("Setting aspect ratio to %s using method %s", option, method_name)
-    # Get the method from AspectControl and call it
-    method = getattr(coordinator.device_manager.executor.aspect_control, method_name)
+    # Get the method directly from executor and call it
+    method = getattr(coordinator.device_manager.executor, method_name)
     await method()
 
 
 async def _select_input_config(coordinator: LumagenCoordinator, option: str) -> None:
-    """Select input configuration."""
-    # Send config recall command
-    config_num = int(option)
-    _LOGGER.debug("Recalling input configuration %d", config_num)
-    await coordinator.device_manager.executor.input_config_recall(config_num)
+    """Select memory bank (A, B, C, D)."""
+    # Map option to memory bank method
+    memory_methods = {
+        "A": coordinator.device_manager.executor.mema,
+        "B": coordinator.device_manager.executor.memb,
+        "C": coordinator.device_manager.executor.memc,
+        "D": coordinator.device_manager.executor.memd,
+    }
+    
+    method = memory_methods.get(option)
+    if method is None:
+        _LOGGER.error("Unknown memory bank: %s", option)
+        return
+    
+    _LOGGER.debug("Recalling memory bank %s", option)
+    await method()
 
 
 def _get_input_source_options(coordinator: LumagenCoordinator) -> list[str]:
@@ -121,15 +134,15 @@ SELECT_ENTITIES: tuple[LumagenSelectEntityDescription, ...] = (
         icon="mdi:aspect-ratio",
         current_option_fn=lambda data: data.device_info.current_source_content_aspect,
         select_option_fn=_select_aspect_ratio,
-        static_options=["4:3", "16:9", "1.85", "1.90", "2.00", "2.20", "2.35", "2.40", "Letterbox"],
+        static_options=["4:3", "16:9", "1.85", "1.90", "2.00", "2.20", "2.35", "2.40", "Letterbox", "NLS"],
     ),
     LumagenSelectEntityDescription(
-        key="input_configuration",
-        name="Input Configuration",
-        icon="mdi:cog",
-        current_option_fn=lambda data: str(data.device_info.active_input_config_number),
+        key="memory_bank",
+        name="Memory Bank",
+        icon="mdi:memory",
+        current_option_fn=lambda data: data.device_info.input_memory if data.device_info else None,
         select_option_fn=_select_input_config,
-        static_options=["0", "1", "2", "3", "4", "5", "6", "7"],
+        static_options=["A", "B", "C", "D"],
     ),
 )
 
