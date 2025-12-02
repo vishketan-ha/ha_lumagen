@@ -165,7 +165,7 @@ class LumagenCoordinator(DataUpdateCoordinator[LumagenData]):
             await asyncio.sleep(1)
             _LOGGER.debug("Fetching labels after connection...")
             try:
-                await self.device_manager.executor.get_labels(get_all=False)
+                await self.device_manager.executor.get_labels()
                 _LOGGER.debug("Labels fetched successfully")
             except Exception as err:
                 _LOGGER.error("Error fetching labels: %s", err, exc_info=True)
