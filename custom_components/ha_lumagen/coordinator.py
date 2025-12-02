@@ -51,6 +51,7 @@ class LumagenCoordinator(DataUpdateCoordinator[LumagenData]):
         )
         self.device_manager = device_manager
         self.entry = entry
+        self._event_listeners = []  # Track registered listeners for cleanup
         self._setup_event_listeners()
 
     def _setup_event_listeners(self) -> None:
@@ -58,46 +59,46 @@ class LumagenCoordinator(DataUpdateCoordinator[LumagenData]):
         dispatcher = self.device_manager.dispatcher
         
         # Subscribe to all relevant state changes
-        dispatcher.register_listener(
-            "device_status", 
-            self._create_event_handler("device_status")
-        )
-        dispatcher.register_listener(
-            "input_labels",
-            self._create_event_handler("input_labels")
-        )
-        dispatcher.register_listener(
-            "physical_input_selected",
-            self._create_event_handler("physical_input_selected")
-        )
-        dispatcher.register_listener(
-            "current_source_content_aspect",
-            self._create_event_handler("current_source_content_aspect")
-        )
-        dispatcher.register_listener(
-            "detected_source_aspect",
-            self._create_event_handler("detected_source_aspect")
-        )
-        dispatcher.register_listener(
-            "source_mode",
-            self._create_event_handler("source_mode")
-        )
-        dispatcher.register_listener(
-            "source_vertical_rate",
-            self._create_event_handler("source_vertical_rate")
-        )
-        dispatcher.register_listener(
-            "source_dynamic_range",
-            self._create_event_handler("source_dynamic_range")
-        )
-        dispatcher.register_listener(
-            "is_alive",
-            self._create_event_handler("is_alive")
-        )
-        dispatcher.register_listener(
-            EventType.CONNECTION_STATE,
-            self._handle_connection_state
-        )
+        # Track each listener for cleanup
+        # Use dedicated handler for device_status to handle power-on refresh
+        power_handler = lambda _, ed: asyncio.create_task(self._handle_power_state_change(_, ed))
+        dispatcher.register_listener("device_status", power_handler)
+        self._event_listeners.append(("device_status", power_handler))
+        
+        input_labels_handler = self._create_event_handler("input_labels")
+        dispatcher.register_listener("input_labels", input_labels_handler)
+        self._event_listeners.append(("input_labels", input_labels_handler))
+        
+        physical_input_handler = self._create_event_handler("physical_input_selected")
+        dispatcher.register_listener("physical_input_selected", physical_input_handler)
+        self._event_listeners.append(("physical_input_selected", physical_input_handler))
+        
+        content_aspect_handler = self._create_event_handler("current_source_content_aspect")
+        dispatcher.register_listener("current_source_content_aspect", content_aspect_handler)
+        self._event_listeners.append(("current_source_content_aspect", content_aspect_handler))
+        
+        detected_aspect_handler = self._create_event_handler("detected_source_aspect")
+        dispatcher.register_listener("detected_source_aspect", detected_aspect_handler)
+        self._event_listeners.append(("detected_source_aspect", detected_aspect_handler))
+        
+        source_mode_handler = self._create_event_handler("source_mode")
+        dispatcher.register_listener("source_mode", source_mode_handler)
+        self._event_listeners.append(("source_mode", source_mode_handler))
+        
+        vertical_rate_handler = self._create_event_handler("source_vertical_rate")
+        dispatcher.register_listener("source_vertical_rate", vertical_rate_handler)
+        self._event_listeners.append(("source_vertical_rate", vertical_rate_handler))
+        
+        dynamic_range_handler = self._create_event_handler("source_dynamic_range")
+        dispatcher.register_listener("source_dynamic_range", dynamic_range_handler)
+        self._event_listeners.append(("source_dynamic_range", dynamic_range_handler))
+        
+        is_alive_handler = self._create_event_handler("is_alive")
+        dispatcher.register_listener("is_alive", is_alive_handler)
+        self._event_listeners.append(("is_alive", is_alive_handler))
+        
+        dispatcher.register_listener(EventType.CONNECTION_STATE, self._handle_connection_state)
+        self._event_listeners.append((EventType.CONNECTION_STATE, self._handle_connection_state))
         
         _LOGGER.debug("Event listeners registered for pure event-driven updates")
 
@@ -122,6 +123,37 @@ class LumagenCoordinator(DataUpdateCoordinator[LumagenData]):
         
         # Notify all entities of the update
         self.async_set_updated_data(new_data)
+
+    async def _handle_power_state_change(self, _, event_data: dict) -> None:
+        """Handle power state changes."""
+        new_status = event_data.get("value")
+        old_status = self.data.device_status if self.data else None
+        
+        _LOGGER.debug("Power state changed: %s -> %s", old_status, new_status)
+        
+        # If transitioning from Standby to Active, schedule a full refresh
+        if old_status == DeviceStatus.STANDBY and new_status == DeviceStatus.ACTIVE:
+            _LOGGER.info("Device powered on, scheduling full refresh in 5 seconds")
+            asyncio.create_task(self._delayed_refresh_on_power_on())
+        
+        # Update coordinator data immediately
+        new_data = LumagenData(
+            device_info=self.device_manager.device_info,
+            is_connected=self.device_manager.is_connected,
+            is_alive=self.device_manager.is_alive,
+            device_status=new_status,
+        )
+        self.async_set_updated_data(new_data)
+
+    async def _delayed_refresh_on_power_on(self) -> None:
+        """Refresh all sensor states 5 seconds after power on."""
+        await asyncio.sleep(5)
+        try:
+            _LOGGER.debug("Executing full refresh after power on")
+            await self.device_manager.executor.get_all()
+            # get_all triggers events that will update all sensors
+        except Exception as err:
+            _LOGGER.error("Failed to refresh after power on: %s", err)
 
     async def _handle_connection_state(self, _, event_data: dict) -> None:
         """Handle connection state changes."""
@@ -161,9 +193,35 @@ class LumagenCoordinator(DataUpdateCoordinator[LumagenData]):
             device_status=self.device_manager.device_status,
         )
 
+    def _cleanup_event_listeners(self) -> None:
+        """Unregister all event listeners."""
+        if not self.device_manager or not hasattr(self.device_manager, 'dispatcher'):
+            return
+        
+        dispatcher = self.device_manager.dispatcher
+        
+        # Check if dispatcher has unregister method
+        if not hasattr(dispatcher, 'unregister_listener'):
+            _LOGGER.debug("Dispatcher does not support unregister_listener, skipping cleanup")
+            return
+        
+        _LOGGER.debug("Unregistering %d event listeners", len(self._event_listeners))
+        for event_type, handler in self._event_listeners:
+            try:
+                dispatcher.unregister_listener(event_type, handler)
+            except Exception as err:
+                _LOGGER.debug("Error unregistering listener for %s: %s", event_type, err)
+        
+        self._event_listeners.clear()
+        _LOGGER.debug("Event listeners cleanup completed")
+
     async def async_shutdown(self) -> None:
         """Shutdown the coordinator and close device connection."""
         _LOGGER.info("Shutting down Lumagen coordinator")
+        
+        # Clean up event listeners first
+        self._cleanup_event_listeners()
+        
         if self.device_manager:
             try:
                 _LOGGER.debug("Closing device connection")
